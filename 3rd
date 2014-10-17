@@ -1,0 +1,300 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Sep 22 00:07:31 2014
+
+@author: Weizhi
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Sep 21 00:44:08 2014
+
+@author: Weizhi
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 19 20:09:30 2014
+
+@author: Weizhi
+"""
+
+import csv
+import numpy as np
+
+from sklearn import cross_validation 
+import pylab as plt
+#%% Loading the data
+plt.close('all')
+def OpenCVS(path):
+    f = open(path,'rb')
+    reader = csv.reader(f)
+    labels = []
+    for row in reader:
+        labels.append(row)
+    f.close()
+    data = np.array(labels)
+    return data
+train_path = 'C:/Users/Weizhi/Desktop/Datas/Kaggle/training.csv'
+test_path = 'C:/Users/Weizhi/Desktop/Datas/Kaggle/sorted_test.csv'
+train = OpenCVS(train_path)
+test = OpenCVS(test_path)
+
+targetName = train[0,-5:]
+
+def findfeature(data):
+    Index = []
+    for i in range(data.shape[1]):
+        if train[0,i][0] == 'm':
+            Index.append(i)
+    return Index
+Index = findfeature(train)
+Data = train[1:,Index]
+
+indexTest = findfeature(test)
+TestData = test[1:,Index]
+
+Target= train[1:,train.shape[1]-5:]
+
+feature= np.array([float(i) for i in Data.ravel() ]).reshape(Data.shape)
+target = np.array([float(i) for i in Target.ravel() ]).reshape(Target.shape)
+
+TestData_1 = np.array([float(i) for i in TestData.ravel() ]).reshape(TestData.shape)
+
+train = None
+
+#%% data pre-processing, data corss validtion
+from sklearn.cross_validation import StratifiedKFold
+
+skf = StratifiedKFold(target[:,1],10)
+trainIndex = []
+testIndex = []
+count = 0
+for train, test in skf:
+    trainIndex.append(train)
+    testIndex.append(test)
+
+#train = {}
+#test = {}
+#for i in range(5):
+#    test[i] = testIndex[i]
+#    train[i] = trainIndex[i]
+#
+from random import randint  
+Index =randint(0,9)
+
+
+trainData_1 = feature[trainIndex[Index],:]
+testData_1 = feature[testIndex[Index],:]
+
+
+print 'The train sample size is %d' % trainData_1.shape[0]
+
+print 'The test sample size is %d' % testData_1.shape[0]
+output = []
+error = []
+
+
+
+
+
+    
+class pattern:
+    def __init__(self,clf,trainData,testData,targetTrain,targetTest,output,error):
+        self.trainData = trainData
+        self.testData= testData
+        self.targetTrain = targetTrain
+        self.targetTest = targetTest
+        self.clf = clf
+        self.output = []
+        self.error = []
+    
+    def Train(self):
+        """training and test the data"""
+        self.clf.fit(self.trainData,self.targetTrain)
+        
+        for i in range(len(self.testData)):
+            self.output.append(self.clf.predict(self.testData[i,:]))
+            self.error.append(abs(self.targetTest[i]-self.clf.predict(self.testData[i,:])))
+        return self.output,self.error
+    
+    def validation(self):
+        """Plot the error bar"""
+        plt.figure()
+        plt.plot(np.arange(len(self.testData)),self.output,color = 'b',label='Output')
+        plt.plot(np.arange(len(self.testData)),self.targetTest,color = 'r',label = 'True')
+        plt.legend()
+        plt.title('Model validation %s' % self.clf)
+
+
+
+
+#%% data 
+
+
+from sklearn import linear_model
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+
+from sklearn.feature_selection import RFECV
+from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.pipeline import make_pipeline
+
+clf = linear_model.LinearRegression()
+clf_Ridge= linear_model.Ridge(alpha = 0.7)
+clf_bayesian = linear_model.BayesianRidge()
+clf_SVR = SVR(kernel='rbf', C=1e3, degree=6)
+estimator = SVR(kernel="linear")
+
+def FeatureIndex1(clf_RF):
+    FeatureImportance = clf_RF.feature_importances_
+    MeanFeautre = clf_RF.feature_importances_.mean()
+#    StdFeature = FeatureImportance.std()
+    FeatureIndex = []
+    for i in range(len(clf_RF.feature_importances_)):
+        if FeatureImportance[i] >= MeanFeautre*0.4:
+            FeatureIndex.append(i)
+    return FeatureIndex
+    
+    
+def FeatureIndex2(clf_RF):
+    FeatureImportance = clf_RF.get_support()
+    FeatureIndex = []
+    for i in range(len(FeatureImportance)):
+        if FeatureImportance[i] == True:
+            FeatureIndex.append(i)
+    return FeatureIndex
+    
+testOutput_LR = []
+testOutput_Rid = []
+testOutput_Bay = []
+testOuput_RF =[]
+testOuput_SVR =[]
+modelOutput = []
+testOutput_feature = []
+# Run the code
+for i in range(target.shape[1]):
+    print '             '
+    print '             '
+    print 'one regression begins %d' % i
+    Target = target[:,i]  
+    clf_RF = None
+    targetTrain = Target[trainIndex[Index]]
+    targetTest = Target[testIndex[Index]]
+    
+#%% Random forest
+    clf_RF = RandomForestRegressor(n_estimators=300, \
+                        max_features = "sqrt" ,\
+                       max_depth = 300, \
+                       min_samples_split=20, \
+                       max_leaf_nodes = 600)
+    
+#    clf_RF = RFECV(estimator)
+                       
+    clf_RF.fit(trainData_1 ,targetTrain)
+    FeatureIndexOne = FeatureIndex1(clf_RF) 
+    
+    #%% Training
+    print 'the number of feature is %d' % len(FeatureIndexOne)
+    
+    
+    
+#    print 'the number of feature is %d' % len(FeatureIndex)
+    from sklearn.feature_selection import SelectKBest,SelectPercentile
+    from sklearn.feature_selection import chi2,f_regression
+    #%% Univariate feature selection
+    X_new = None
+    X_new = SelectKBest(f_regression,k = int(0.7*trainData_1.shape[1])) \
+    .fit(trainData_1,targetTrain)
+    FeatureIndexTwo = FeatureIndex2(X_new)
+    print 'the number of feature is %d' % len(FeatureIndexTwo)
+    #%%
+    FeatureIndex = list(set(FeatureIndexTwo).intersection(FeatureIndexOne))
+    print 'the number of feature is %d' % len(FeatureIndex)
+    trainData = trainData_1 [:,FeatureIndex]
+    testData = testData_1[:,FeatureIndex]
+    TestData_2 = TestData_1[:,FeatureIndex]
+    #%% ANOVA:
+    anova_filter = SelectKBest(f_regression, k=len(FeatureIndex))
+    clf_svr2 = SVR(kernel="linear")
+    anova_svm = make_pipeline(anova_filter, clf_svr2)
+    anova_svm.fit(trainData,targetTrain)
+        
+    
+    
+    
+    a = pattern(clf,trainData,testData,targetTrain,targetTest,output,error)
+    a.Train()
+    a.validation()
+    print 'the linear error is %f' %  sum(a.error)
+    
+    b = pattern(clf_Ridge,trainData,testData,targetTrain,targetTest,output,error)
+    b.Train()
+    b.validation()
+    print 'the ridge error is %f' % sum(b.error)
+
+    c = pattern(clf_bayesian,trainData,testData,targetTrain,targetTest,output,error)
+    c.Train()
+    c.validation()
+    print 'the bayesina error is %f' % sum(c.error)
+    
+    d = pattern(clf_RF,trainData,testData,targetTrain,targetTest,output,error)
+    d.Train()
+    d.validation()
+    print 'the RF error is %f' % sum(d.error)
+    
+    e = pattern(clf_SVR,trainData,testData,targetTrain,targetTest,output,error)
+    e.Train()
+    e.validation()
+    print 'the SVR error is %f' % sum(e.error)
+    
+    f = pattern(anova_svm,trainData,testData,targetTrain,targetTest,output,error)
+    f.Train()
+    f.validation()
+    print 'the SVR 2 error is %f' % sum(f.error)
+    
+#    plt.figure()
+#    plt.plot(np.arange(len(a.testData)),a.targetTest,color = 'r',label = 'True')
+#    plt.plot(np.arange(len(a.testData)),a.output,color = 'b',label='Linear')
+#    
+#    plt.plot(np.arange(len(b.testData)),b.output,color = 'k',label = 'Ridge',marker='*')
+#    plt.plot(np.arange(len(c.testData)),c.output,color = 'g',label = 'Bayesian',marker='o')
+#    plt.plot(np.arange(len(c.testData)),d.output,color = 'k',label = 'RandomForest',marker='o')
+#    plt.plot(np.arange(len(c.testData)),e.output,color = 'b',label = 'RandomForest',marker='o')
+#    plt.legend()
+    testOutput_LR.append(a.clf.predict(TestData_2))
+    testOutput_Rid.append(b.clf.predict(TestData_2))
+    testOutput_Bay.append(c.clf.predict(TestData_2))
+    testOuput_RF.append(d.clf.predict(TestData_2))
+    testOuput_SVR.append(e.clf.predict(TestData_2))
+    testOutput_feature.append(f.clf.predict(TestData_2))
+    
+    #%% a is not good
+    errorList = [sum(b.error) ,sum(c.error), sum(d.error), sum(e.error), sum(f.error)]
+    clfList = [b.clf,c.clf,d.clf,e.clf,f.clf]
+    regression = [clf_Ridge,clf_bayesian,clf_RF,clf_SVR,anova_svm]
+    for i in range(5):
+        Min = min(errorList)
+        curr = errorList[i]
+        if curr==Min:
+            OutputIndex = i
+            print 'the index classifier is %d' % OutputIndex
+            break
+    Model = regression[OutputIndex].fit(feature[:,FeatureIndex],Target)
+    modelOutput.append(Model.predict(TestData_2))
+#    modelOutput.append(clfList[OutputIndex].predict(TestData_2))
+    
+#%% get the output from the test data
+
+import pandas as pd
+data = pd.read_csv('C:/Users/Weizhi/Desktop/Datas/Kaggle/sample_submission.csv')
+name= ['Ca', 'P', 'pH', 'SOC', 'Sand']
+for i in range(5):
+    data[name[i]] = modelOutput[i]
+
+data.to_csv("sample_submission1.csv",index=False)
+
+data.to_excel('sample_submission1.xls')
+
+
+
